@@ -44,7 +44,7 @@ func queryJsonDoc(docID string) {
 	fmt.Println(doc.Data())
 }
 
-func addStructAsDoc()  {
+func addStructAsDoc(docID string)  {
 	fmt.Println("Add custom struct data as document")
 	data := struct{
 		PropertyId string `json:"property_id"`
@@ -53,13 +53,39 @@ func addStructAsDoc()  {
 		"98765", "Hyatt",
 	}
 
-	result, err := client.Collection(collectionId).Doc("custom-struct").Create(ctx, data)
+	result, err := client.Collection(collectionId).Doc(docID).Create(ctx, data)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Println(result.UpdateTime.String())
+}
+
+func updateStructAsDoc(docID string)  {
+	fmt.Println("Update custom struct data in document")
+
+	result, err := client.Collection(collectionId).Doc(docID).Set(ctx, map[string]interface{}{
+		"Name": "Updated Name",
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(result.UpdateTime.String())
+}
+
+func deleteAll(ids ...string){
+	fmt.Println("Deleting existing docs")
+	for _, id := range ids {
+		result, err := client.Collection(collectionId).Doc(id).Delete(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(result.UpdateTime.String())
+	}
 }
 
 func main() {
@@ -72,8 +98,9 @@ func main() {
 	}
 	defer client.Close()
 
-	//docID := "json-1"
-	//addJsonDoc(docID)
-	//queryJsonDoc(docID)
-	addStructAsDoc()
+	deleteAll("json-1","custom-struct")
+	addJsonDoc("json-1")
+	queryJsonDoc("json-1")
+	addStructAsDoc("custom-struct")
+	updateStructAsDoc("custom-struct")
 }
