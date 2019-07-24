@@ -66,10 +66,10 @@ func queryJsonDocWithRefs(docID string) {
 func addStructAsDoc(docID string) {
 	fmt.Println("Add custom struct data as document")
 	data := struct {
-		PropertyId string `firestore:"property_id"`
+		PropertyId int16 `firestore:"property_id"`
 		Name       string `firestore:"name"`
 	}{
-		"98765", "Hyatt",
+		999, "Hyatt",
 	}
 
 	result, err := client.Collection(collectionId).Doc(docID).Create(ctx, data)
@@ -137,6 +137,27 @@ func deleteAll(ids ...string) {
 	}
 }
 
+func runTransaction(docID string){
+	fmt.Println("Updating doc using transaction")
+
+	ref := client.Collection(collectionId).Doc(docID)
+	err := client.RunTransaction(ctx, func(c context.Context, tx *firestore.Transaction) error {
+		doc, err := tx.Get(ref)
+		if err != nil {
+			log.Fatal(err)
+		}
+		propertyId, err := doc.DataAt("property_id")
+		if err != nil {
+			log.Fatal(err)
+		}
+		return tx.Update(ref, []firestore.Update{{Path: "property_id", Value: propertyId.(int64) + 1}})
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func main() {
 	ctx = context.Background()
 	var e error
@@ -149,11 +170,12 @@ func main() {
 
 	deleteAll("json-1", "json-2", "custom-struct", "doc-ref")
 	addJsonDoc("json-1")
-	queryJsonDoc("doc-ref")
+	queryJsonDoc("json-1")
 	addStructAsDoc("custom-struct")
 	updateStructAsDoc("custom-struct")
 	addJsonDoc("json-2")
 	replaceDoc("json-2")
 	docRef("doc-ref", "json-1")
 	queryJsonDocWithRefs("doc-ref")
+	runTransaction("custom-struct")
 }
