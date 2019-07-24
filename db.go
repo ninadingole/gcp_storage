@@ -44,11 +44,30 @@ func queryJsonDoc(docID string) {
 	fmt.Println(doc.Data())
 }
 
-func addStructAsDoc(docID string)  {
+func queryJsonDocWithRefs(docID string) {
+	fmt.Println("Querying json data")
+	doc, err := client.Collection(collectionId).Doc(docID).Get(ctx)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data := doc.Data()
+	ref := data["ref"].(*firestore.DocumentRef)
+	snapshot, err := ref.Get(ctx)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(snapshot.Data())
+}
+
+func addStructAsDoc(docID string) {
 	fmt.Println("Add custom struct data as document")
-	data := struct{
-		PropertyId string `json:"property_id"`
-		Name string
+	data := struct {
+		PropertyId string `firestore:"property_id"`
+		Name       string `firestore:"name"`
 	}{
 		"98765", "Hyatt",
 	}
@@ -62,11 +81,25 @@ func addStructAsDoc(docID string)  {
 	fmt.Println(result.UpdateTime.String())
 }
 
-func updateStructAsDoc(docID string)  {
+func updateStructAsDoc(docID string) {
 	fmt.Println("Update custom struct data in document")
 
 	result, err := client.Collection(collectionId).Doc(docID).Set(ctx, map[string]interface{}{
-		"Name": "Updated Name",
+		"name": "Updated Name",
+	}, firestore.MergeAll)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(result.UpdateTime.String())
+}
+
+func replaceDoc(docID string) {
+	fmt.Println("Replacing document")
+
+	result, err := client.Collection(collectionId).Doc(docID).Set(ctx, map[string]interface{}{
+		"Name": "Replaced doc",
 	})
 
 	if err != nil {
@@ -76,7 +109,23 @@ func updateStructAsDoc(docID string)  {
 	fmt.Println(result.UpdateTime.String())
 }
 
-func deleteAll(ids ...string){
+func docRef(docID string, refId string) {
+	fmt.Println("Replacing document")
+
+	result := client.Collection(collectionId).Doc(refId)
+
+	writeResult, err := client.Collection(collectionId).Doc(docID).Create(ctx, map[string]interface{}{
+		"ref": result,
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(writeResult.UpdateTime.String())
+}
+
+func deleteAll(ids ...string) {
 	fmt.Println("Deleting existing docs")
 	for _, id := range ids {
 		result, err := client.Collection(collectionId).Doc(id).Delete(ctx)
@@ -98,9 +147,13 @@ func main() {
 	}
 	defer client.Close()
 
-	deleteAll("json-1","custom-struct")
+	deleteAll("json-1", "json-2", "custom-struct", "doc-ref")
 	addJsonDoc("json-1")
-	queryJsonDoc("json-1")
+	queryJsonDoc("doc-ref")
 	addStructAsDoc("custom-struct")
 	updateStructAsDoc("custom-struct")
+	addJsonDoc("json-2")
+	replaceDoc("json-2")
+	docRef("doc-ref", "json-1")
+	queryJsonDocWithRefs("doc-ref")
 }
