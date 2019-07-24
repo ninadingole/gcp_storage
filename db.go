@@ -11,18 +11,20 @@ import (
 )
 
 var (
-	ctx context.Context
+	ctx    context.Context
 	client *firestore.Client
 )
 
-func addJsonDoc() {
+const collectionId = "sample"
+
+func addJsonDoc(docID string) {
 	fmt.Println("Writing json data")
 	bytes, _ := ioutil.ReadFile("./single-property.json")
 
 	var data interface{}
 	json.Unmarshal(bytes, &data)
 
-	writeResult, err := client.Collection("sample").Doc("json-1").Create(ctx, data)
+	writeResult, err := client.Collection(collectionId).Doc(docID).Create(ctx, data)
 
 	if err != nil {
 		log.Fatal(err)
@@ -31,15 +33,33 @@ func addJsonDoc() {
 	fmt.Println(writeResult.UpdateTime.String())
 }
 
-func queryJsonDoc() {
+func queryJsonDoc(docID string) {
 	fmt.Println("Querying json data")
-	doc, err := client.Collection("sample").Doc("json-1").Get(ctx)
+	doc, err := client.Collection(collectionId).Doc(docID).Get(ctx)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Println(doc.Data())
+}
+
+func addStructAsDoc()  {
+	fmt.Println("Add custom struct data as document")
+	data := struct{
+		PropertyId string `json:"property_id"`
+		Name string
+	}{
+		"98765", "Hyatt",
+	}
+
+	result, err := client.Collection(collectionId).Doc("custom-struct").Create(ctx, data)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(result.UpdateTime.String())
 }
 
 func main() {
@@ -52,6 +72,8 @@ func main() {
 	}
 	defer client.Close()
 
-	addJsonDoc()
-	queryJsonDoc()
+	//docID := "json-1"
+	//addJsonDoc(docID)
+	//queryJsonDoc(docID)
+	addStructAsDoc()
 }
