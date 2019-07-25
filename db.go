@@ -164,7 +164,7 @@ func queryStructDoc(id string){
 	fmt.Println("Querying doc using query object")
 
 	collection := client.Collection(collectionId)
-	q := collection.Where("name", "==", "Updated Name")
+	q := collection.Where("name", "==", "Test Property Name")
 	documents := q.Documents(ctx)
 	for {
 		doc, e := documents.Next()
@@ -178,6 +178,28 @@ func queryStructDoc(id string){
 
 		fmt.Println(doc.Data())
 	}
+}
+
+func preconditionUpdate(docId string){
+	fmt.Println("Precondition update")
+
+	coll := client.Collection(collectionId)
+	doc := coll.Doc(docId)
+	snapshot, err := doc.Get(ctx)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	result , err := doc.Update(ctx,
+		[]firestore.Update{{Path: "name", Value: "Updated Name 1"}},
+		firestore.LastUpdateTime(snapshot.UpdateTime))
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println(result.UpdateTime.String())
 }
 
 func main() {
@@ -195,10 +217,11 @@ func main() {
 	queryJsonDoc("json-1")
 	addStructAsDoc("custom-struct")
 	updateStructAsDoc("custom-struct")
-	queryStructDoc("custom-struct")
+	queryStructDoc("json-1")
 	addJsonDoc("json-2")
 	replaceDoc("json-2")
 	docRef("doc-ref", "json-1")
 	queryJsonDocWithRefs("doc-ref")
 	runTransaction("custom-struct")
+	preconditionUpdate("custom-struct")
 }
