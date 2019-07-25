@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"cloud.google.com/go/firestore"
+	"google.golang.org/api/iterator"
 )
 
 var (
@@ -150,11 +151,32 @@ func runTransaction(docID string){
 		if err != nil {
 			log.Fatal(err)
 		}
+
 		return tx.Update(ref, []firestore.Update{{Path: "property_id", Value: propertyId.(int64) + 1}})
 	})
 
 	if err != nil {
 		log.Fatal(err)
+	}
+}
+
+func queryStructDoc(id string){
+	fmt.Println("Querying doc using query object")
+
+	collection := client.Collection(collectionId)
+	q := collection.Where("name", "==", "Updated Name")
+	documents := q.Documents(ctx)
+	for {
+		doc, e := documents.Next()
+		if e == iterator.Done {
+			break
+		}
+
+		if e != nil {
+			log.Fatal(e)
+		}
+
+		fmt.Println(doc.Data())
 	}
 }
 
@@ -173,6 +195,7 @@ func main() {
 	queryJsonDoc("json-1")
 	addStructAsDoc("custom-struct")
 	updateStructAsDoc("custom-struct")
+	queryStructDoc("custom-struct")
 	addJsonDoc("json-2")
 	replaceDoc("json-2")
 	docRef("doc-ref", "json-1")
