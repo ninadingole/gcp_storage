@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
+	"strconv"
+	"time"
 
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
@@ -23,7 +26,7 @@ func addJsonDoc(docID string) {
 	bytes, _ := ioutil.ReadFile("./single-property.json")
 
 	var data interface{}
-	json.Unmarshal(bytes, &data)
+	_ = json.Unmarshal(bytes, &data)
 
 	writeResult, err := client.Collection(collectionId).Doc(docID).Create(ctx, data)
 
@@ -67,7 +70,7 @@ func queryJsonDocWithRefs(docID string) {
 func addStructAsDoc(docID string) {
 	fmt.Println("Add custom struct data as document")
 	data := struct {
-		PropertyId int16 `firestore:"property_id"`
+		PropertyId int16  `firestore:"property_id"`
 		Name       string `firestore:"name"`
 	}{
 		999, "Hyatt",
@@ -138,7 +141,7 @@ func deleteAll(ids ...string) {
 	}
 }
 
-func runTransaction(docID string){
+func runTransaction(docID string) {
 	fmt.Println("Updating doc using transaction")
 
 	ref := client.Collection(collectionId).Doc(docID)
@@ -160,7 +163,7 @@ func runTransaction(docID string){
 	}
 }
 
-func queryStructDoc(id string){
+func queryStructDoc(id string) {
 	fmt.Println("Querying doc using query object")
 
 	collection := client.Collection(collectionId)
@@ -180,7 +183,7 @@ func queryStructDoc(id string){
 	}
 }
 
-func preconditionUpdate(docId string){
+func preconditionUpdate(docId string) {
 	fmt.Println("Precondition update")
 
 	coll := client.Collection(collectionId)
@@ -191,7 +194,7 @@ func preconditionUpdate(docId string){
 		log.Fatal(err)
 	}
 
-	result , err := doc.Update(ctx,
+	result, err := doc.Update(ctx,
 		[]firestore.Update{{Path: "name", Value: "Updated Name 1"}},
 		firestore.LastUpdateTime(snapshot.UpdateTime))
 
@@ -202,16 +205,7 @@ func preconditionUpdate(docId string){
 	fmt.Println(result.UpdateTime.String())
 }
 
-func main() {
-	ctx = context.Background()
-	var e error
-	client, e = firestore.NewClient(ctx, "golearning-qa")
-
-	if e != nil {
-		log.Fatal(e)
-	}
-	defer client.Close()
-
+func runExamples() {
 	deleteAll("json-1", "json-2", "custom-struct", "doc-ref")
 	addJsonDoc("json-1")
 	queryJsonDoc("json-1")
@@ -224,4 +218,99 @@ func main() {
 	queryJsonDocWithRefs("doc-ref")
 	runTransaction("custom-struct")
 	preconditionUpdate("custom-struct")
+}
+
+func main() {
+	//_ = os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:8081")
+
+	ctx = context.Background()
+	var e error
+	client, e = firestore.NewClient(ctx, "golearning-qa")
+
+	if e != nil {
+		log.Fatal(e)
+	}
+	defer client.Close()
+
+	//benchInsert()
+	//benchGet()
+	batchUpdates()
+}
+
+func batchUpdates(){
+	source := rand.NewSource(1)
+
+	bytes, _ := ioutil.ReadFile("./single-property.json")
+
+	var data map[string]interface{}
+	_ = json.Unmarshal(bytes, &data)
+
+	collection := client.Collection(collectionId)
+	fmt.Println("Starting benchmarks for batch updation")
+	startNanos := time.Now().UnixNano()
+
+	for j := 0; j < 100; j++ {
+		batch := client.Batch()
+		for i := 0; i < 200; i ++ {
+			id := strconv.FormatInt(source.Int63(), 10)
+			data["property_id"] = id
+			batch.Set(collection.Doc(id), data)
+		}
+		_, err := batch.Commit(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	total := (time.Now().UnixNano() - startNanos) / 1000000
+
+	fmt.Printf("Total %v for 20000 docs %v/doc", total, total/100)
+}
+
+func benchInsert() {
+	source := rand.NewSource(1)
+
+	bytes, _ := ioutil.ReadFile("./single-property.json")
+
+	var data map[string]interface{}
+	_ = json.Unmarshal(bytes, &data)
+
+	collection := client.Collection(collectionId)
+	fmt.Println("Starting benchmarks for insertion")
+	startNanos := time.Now().UnixNano()
+	for j := 0; j < 20000; j++ {
+		id := strconv.FormatInt(source.Int63(), 10)
+		data["property_id"] = id
+		_, err := collection.Doc(id).Create(ctx, data)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	total := (time.Now().UnixNano() - startNanos) / 1000000
+
+	fmt.Printf("Total %v for 1000 docs %v/doc", total, total/20000)
+}
+
+func benchGet() {
+	source := rand.NewSource(1)
+	collection := client.Collection(collectionId)
+	fmt.Println("Starting benchmarks for get")
+
+	startNanos := time.Now().UnixNano()
+	for j := 0; j < 2000; j++ {
+		docIds := make([]*firestore.DocumentRef, 10)
+		for i := 0; i < 10; i++ {
+			id := strconv.FormatInt(source.Int63(), 10)
+			docIds[i] = collection.Doc(id)
+		}
+		docs, err := client.GetAll(ctx, docIds)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, doc := range docs {
+			_ = doc.Data()
+		}
+	}
+	total := (time.Now().UnixNano() - startNanos) / 1000000
+
+	fmt.Printf("Total %v for 1000 docs %v/doc", total, total/2000)
 }
